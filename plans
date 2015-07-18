@@ -1,0 +1,40 @@
+- make music playing thing that logs any time current playing state changes, and what point in the song/what song. log should be usable programmatically
+- make music tagging thing that allows editing tags for song currently playing
+    - positive inclusion, positive inclusion, negative data
+- make music tagging storage thing that somewhat-reliably stores tags for songs, ideally in some very simple data format
+    - load music tags from id3 data into music tag database
+- make music next-song selection
+- make music tag prediction thing
+    - with blocks?
+    - load tags from tag database
+    - load music data from disk somewhat intelligently? branch prediction problem lol
+    - load music data with [insert library here]
+    - architecture ideas:
+        - fft thing -> conv (10x10 x10 relu or whatever) -> maxpool /3 -> conv (10x10 x10 relu or whatever) -> maxpool /5 -> conv to 1xn -> simplify -> self-recurrent fc -> self-recurrent fc -> discounted prediction
+        - audio stream -> conv ... not sure, need to test this out
+        - combine elements of above two so it can learn to use either?
+            - this will probably do pretty well too? I'm unsure how well convnets work with position independence
+        - none of these seem likely to be able to learn tunes
+    - fft ideas:
+        - log thing
+        - sharded fft, with rolling 2d frequency map composed of multiple levels of fft
+        - rolling single fft, strided across the input stream
+- make skip point prediction thing?
+- make play count prediction thing?
+- make skip count prediction thing?
+- make skip ratio prediction thing?
+
+next actions:
+
+[@] make music playing thing that logs any time current playing state changes, and what point in the song/what song.
+    - save stuff to ~/.musicdata?
+[@] figure out fft
+[ ] make music tagging storage thing that somewhat-reliably stores tags for songs, ideally in some very simple data format
+    - load music tags from id3 data into music tag database
+    - independent of mpd - filename?
+        - would depending on mpd be easier? voi? halp how do I voi
+    - save to ~/.musicdata or whereever
+[ ]
+
+other stuff:
+    - copying-to-sm cron job for data that is at high risk of overwrite (bashrc, music data, etc)

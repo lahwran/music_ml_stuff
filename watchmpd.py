@@ -6,13 +6,7 @@ import gzip
 import time
 import json
 from localdata import mpd_password as password
-
-x = os.path.expanduser("~/.musicdata")
-try:
-    os.mkdir(x)
-except:
-    # open up your mouth and EAT IT
-    pass
+from musicdata import datadir
 
 client = mpd.MPDClient()
 
@@ -20,7 +14,7 @@ client.connect("localhost", 6600)
 client.password(password)
 
 def pall(topics):
-    output = gzip.open(os.path.join(x, "log"), "a")
+    output = gzip.open(os.path.join(datadir, "log"), "a")
     currentsong = client.currentsong().get("file")
 
     now = datetime.datetime.now().isoformat("T")

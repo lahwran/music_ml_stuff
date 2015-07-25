@@ -13,7 +13,7 @@ devnull = open("/dev/null", "w")
 def load(path):
     import time
     z = time.time()
-    subprocess.call(["ffmpeg", "-y", "-i", path, "/tmp/tmp.wav"],
+    subprocess.call(["ffmpeg", "-y", "-i", path, "-osr", "44100", "/tmp/tmp.wav"],
             stdout=devnull, stderr=devnull)
 
     data, samplerate, format_ = audiolab.wavread("/tmp/tmp.wav")

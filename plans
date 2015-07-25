@@ -29,11 +29,16 @@ next actions:
 [@] make music playing thing that logs any time current playing state changes, and what point in the song/what song.
     - save stuff to ~/.musicdata?
 [@] figure out fft
-[ ] make music tagging storage thing that somewhat-reliably stores tags for songs, ideally in some very simple data format
+[@] make music tagging storage thing that somewhat-reliably stores tags for songs, ideally in some very simple data format
     - load music tags from id3 data into music tag database
     - independent of mpd - filename?
         - would depending on mpd be easier? voi? halp how do I voi
     - save to ~/.musicdata or whereever
+[@] load audio as numpy array
+[ ] blocks simplest convnet over audio only to predict lyrical or not
+    - variable length songs: cut to a particular length
+    - wide initial layer with high stride -> skip a bunch of depth
+        -> lol maybe fft would do this for us?
 [ ]
 
 other stuff:

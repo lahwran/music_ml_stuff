@@ -1,2 +1,5 @@
 *.wav
 *.log
+localdata.py
+local/
+.ipynb_checkpoints/

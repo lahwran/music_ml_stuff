@@ -23,7 +23,7 @@ class L(object):
         self.convcount = convcount
         self.width = width
         if stride is None:
-            self.stride = max(poolamount / 3, 1)
+            self.stride = max(int(poolamount / 3), 1)
         else:
             self.stride = stride
         self.poolamount = poolamount
@@ -114,127 +114,113 @@ print len(net)
 
 
 
-from blocks.bricks.conv import ConvolutionalLayer, ConvolutionalSequence, ConvolutionalActivation
+from blocks.bricks.conv import (ConvolutionalLayer, ConvolutionalSequence,
+        ConvolutionalActivation, Flattener)
+from blocks.bricks import MLP, Softmax, FeedforwardSequence, Initializable
+from blocks.initialization import Constant, IsotropicGaussian
 
 
 from blocks.bricks import Rectifier
-convolutions = ConvolutionalSequence(
-    layers=[
-        ConvolutionalLayer(
-            name="c1",
-            activation=Rectifier().apply,
-            filter_size=(9, 1),
-            num_filters=10,
-            conv_step=(2, 1),
-            pooling_size=(2, 1),
-            pooling_step=(1, 1),
-            ),
-        ConvolutionalActivation(
-            name="c2",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-        ConvolutionalLayer(
-            name="c3",
-            activation=Rectifier().apply,
-            filter_size=(3, 1),
-            num_filters=10,
-            conv_step=(1, 1),
-            pooling_size=(3, 1),
-            pooling_step=(1, 1),
-        ),
-        ConvolutionalActivation(
-            name="c4",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-        ConvolutionalLayer(
-            name="c5",
-            activation=Rectifier().apply,
-            filter_size=(5, 1),
-            num_filters=10,
-            conv_step=(1, 1),
-            pooling_size=(5, 1),
-            pooling_step=(1, 1),
-        ),
-        ConvolutionalActivation(
-            name="c6",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-        ConvolutionalLayer(
-            name="c7",
-            activation=Rectifier().apply,
-            filter_size=(11, 1),
-            num_filters=10,
-            conv_step=(4, 1),
-            pooling_size=(11, 1),
-            pooling_step=(1, 1),
-        ),
-        ConvolutionalActivation(
-            name="c8",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-        ConvolutionalLayer(
-            name="c9",
-            activation=Rectifier().apply,
-            filter_size=(21, 1),
-            num_filters=10,
-            conv_step=(7, 1),
-            pooling_size=(21, 1),
-            pooling_step=(1, 1),
-        ),
-        ConvolutionalActivation(
-            name="c10",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-        ConvolutionalLayer(
-            name="c11",
-            activation=Rectifier().apply,
-            filter_size=(31, 1),
-            num_filters=10,
-            conv_step=(10, 1),
-            pooling_size=(31, 1),
-            pooling_step=(1, 1),
-        ),
-        ConvolutionalActivation(
-            name="c12",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-        ConvolutionalLayer(
-            name="c13",
-            activation=Rectifier().apply,
-            filter_size=(41, 1),
-            num_filters=10,
-            conv_step=(13, 1),
-            pooling_size=(41, 1),
-            pooling_step=(1, 1),
-        ),
-        ConvolutionalActivation(
-            name="c14",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-        ConvolutionalLayer(
-            name="c15",
-            activation=Rectifier().apply,
-            filter_size=(41, 1),
-            num_filters=10,
-            conv_step=(13, 1),
-            pooling_size=(41, 1),
-            pooling_step=(1, 1),
-        ),
-        ConvolutionalActivation(
-            name="c16",
-            activation=Rectifier().apply,
-            filter_size=(1, 1),
-            num_filters=1),
-    ],
-    image_size=(input_size, 1),
-    num_channels=2)
 
-convolutions.initialize()
 
+class Derpnet(FeedforwardSequence, Initializable):
+    def __init__(self, input_size, **kwargs):
+        self.layers = []
+        self.layerinfo = [
+            L(10, 9, 2, 2),
+            L(10, 3, 3),
+            L(10, 5, 5),
+            L(10, 11, 11),
+            L(10, 21, 21),
+            L(10, 31, 31),
+            L(10, 41, 41),
+            L(10, 41, 41),
+        ]
+        for index, l in enumerate(self.layerinfo):
+            self.layers.append(ConvolutionalLayer(
+                name="conv-" + str(index * 2),
+                activation=Rectifier().apply,
+                filter_size=(l.width, 1),
+                num_filters=l.convcount,
+                conv_step=(l.stride, 1),
+                pooling_size=(l.poolamount, 1),
+                pooling_step=(1, 1),
+                biases_init=Constant(0),
+                weights_init=IsotropicGaussian(0.01),
+            ))
+            self.layers.append(ConvolutionalActivation(
+                    name="conv-reduce-" + str(index * 2 + 1),
+                    activation=Rectifier().apply,
+                    filter_size=(1, 1),
+                    biases_init=Constant(0),
+                    weights_init=IsotropicGaussian(0.01),
+                    num_filters=1
+            ))
+        self.convolutions = ConvolutionalSequence(
+            layers=self.layers,
+            image_size=(input_size, 1),
+            num_channels=2)
+
+        self.mlp_activations = [Rectifier(), Softmax()]
+        self.mlp_dims = [128, 3]
+
+        self.top_mlp = MLP(
+            activations=self.mlp_activations,
+            dims=self.mlp_dims,
+                    # note: input is added in _push_allocation_config,
+                    # unlike normal for the mlp class
+            weights_init=IsotropicGaussian(0.01),
+            biases_init=Constant(1))
+
+        self.flattener = Flattener()
+
+        super(Derpnet, self).__init__([
+            self.convolutions.apply,
+            self.flattener.apply,
+            self.top_mlp.apply
+        ], **kwargs)
+
+    def _push_allocation_config(self):
+        self.convolutions._push_allocation_config()
+        conv_out_dim = self.convolutions.get_dim("output")
+
+        self.top_mlp.dims = [numpy.prod(conv_out_dim)] + self.mlp_dims
+
+print input_size
+
+from theano import tensor
+
+#TODO: dropout?
+#TODO: maxout?
+#final_layers = MLP(
+
+net = Derpnet(input_size)
+
+net.initialize()
+
+x = tensor.tensor4("x")
+y = tensor.lmatrix("targets")
+
+probs = convnet.apply(x)
+cost = named_copy(CategoricalCrossEntropy().apply(y.flatten(), probs), 'cost')
+error_rate = named_copy(MisclassificationRate().apply(y.flatten(), probs),
+    'error_rate')
+
+cg = ComputationGraph([cost, error_rate])
+
+algorithm = AdaDelta(cost=cost, parameters=cg.parameters)
+
+print net.children[0].get_dim("input_")
+
+for layer in net.layers:
+    print layer.get_dim("output")
+
+#convolutions.initialize()
+#import pudb; pudb.set_trace()
+#final_layers.push_initialization_config()
+#final_layers.initialize()
+#x = tensor.row('noise')
+
+#result = final_layers.apply(convolutions.apply(x))
+
+print input_size

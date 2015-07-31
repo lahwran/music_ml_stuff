@@ -5,21 +5,62 @@ import subprocess
 import mpd
 import os
 from localdata import mpd_password as password
+from localdata import cache_dir
+from localdata import metadata
+import hashlib
 
+lengths = sorted([m["len"] for m in metadata.values()])
+input_size = sorted(lengths)[5:-5][0]
 
 devnull = open("/dev/null", "w")
 
 
-def load(path):
+def load(path, skip=False):
+    cached = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
+
     import time
     z = time.time()
-    subprocess.call(["ffmpeg", "-y", "-i", path, "-osr", "44100", "/tmp/tmp.wav"],
-            stdout=devnull, stderr=devnull)
+    if not os.path.exists(cached):
+        subprocess.call(["ffmpeg", "-y", "-i", path, "-osr", "44100",
+                cached],
+                stdout=devnull, stderr=devnull)
+        if skip:
+            print "converted file in ", time.time() - z
+    elif skip:
+        print "skipped"
 
-    data, samplerate, format_ = audiolab.wavread("/tmp/tmp.wav")
-    print "loaded file in", time.time() - z
-    return data, samplerate
+    if not skip:
+        data, samplerate, format_ = audiolab.wavread(cached)
+        print "loaded file in", time.time() - z
+        return data, samplerate
 
+
+def convert(path):
+    cached_wav = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
+    cached_numpy = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".npy")
+    if os.path.exists(cached_numpy):
+        print "exists, skipping"
+        return cached_numpy
+
+    data, samplerate = load(path)
+
+    if len(data) < input_size:
+        print "skipping due to being too small:", path
+        return
+
+    middle = len(data)/2
+    half = input_size / 2
+    begin = middle - half
+    end = middle + half
+    cut = data[begin:end]
+    del data
+
+    numpy.save(cached_numpy, cut)
+
+    os.unlink(cached_wav)
+
+    return cached_numpy
+    
 
 def get_current_song():
     client = mpd.MPDClient()

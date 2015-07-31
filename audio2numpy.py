@@ -16,6 +16,8 @@ devnull = open("/dev/null", "w")
 
 
 def load(path, skip=False):
+    # Note: for reasons I haven't bothered to investigate, this always returns
+    # mono. wat?
     cached = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
 
     import time
@@ -35,7 +37,7 @@ def load(path, skip=False):
         return data, samplerate
 
 
-def convert(path):
+def convert_to_floatarray(path):
     cached_wav = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
     cached_numpy = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".npy")
     if os.path.exists(cached_numpy):
@@ -56,6 +58,24 @@ def convert(path):
     del data
 
     numpy.save(cached_numpy, cut)
+
+    os.unlink(cached_wav)
+
+    return cached_numpy
+
+
+def convert_to_png_freq(path):
+    cached_wav = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
+    cached_png = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".png")
+    if os.path.exists(cached_png):
+        print "exists, skipping"
+        return cached_png
+
+    data, samplerate = load(path)
+
+    import freq
+    ff = freq.freqanalysis(data, samplerate)
+    freq.savefft(ff, cached_png)
 
     os.unlink(cached_wav)
 

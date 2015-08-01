@@ -16,8 +16,8 @@ devnull = open("/dev/null", "w")
 
 
 def load(path, skip=False):
-    # Note: for reasons I haven't bothered to investigate, this always returns
-    # mono. wat?
+    # note: contrary to previous assumption, this returns stereo if stereo is
+    # available. whoops!
     cached = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
 
     import time

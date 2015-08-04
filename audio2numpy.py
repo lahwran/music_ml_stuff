@@ -14,32 +14,42 @@ input_size = sorted(lengths)[5:-5][0]
 
 devnull = open("/dev/null", "w")
 
+class SkipHack(Exception):
+    pass
+
 
 def load(path, skip=False):
     # note: contrary to previous assumption, this returns stereo if stereo is
     # available. whoops!
-    cached = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
+    cached = os.path.join(cache_dir, "audio", hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
 
     import time
     z = time.time()
     if not os.path.exists(cached):
-        subprocess.call(["ffmpeg", "-y", "-i", path, "-osr", "44100",
+        print "converting", path,
+        subprocess.check_call(["ffmpeg", "-y", "-i", path, "-osr", "44100",
                 cached],
                 stdout=devnull, stderr=devnull)
         if skip:
             print "converted file in ", time.time() - z
     elif skip:
-        print "skipped"
+        print "skipped."
+
+    stat = os.stat(cached)
+    if stat.st_size > 70 * 1024 * 1024:
+        print "SKIPPING %smb" % (stat.st_size / (1024 * 1024))
+        raise SkipHack
+    else: print "DOING %smb" % (stat.st_size / (1024 * 1024))
 
     if not skip:
         data, samplerate, format_ = audiolab.wavread(cached)
-        print "loaded file in", time.time() - z
+        print "loaded:", time.time() - z,
         return data, samplerate
 
 
 def convert_to_floatarray(path):
-    cached_wav = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
-    cached_numpy = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".npy")
+    cached_wav = os.path.join(cache_dir, "audio", hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
+    cached_numpy = os.path.join(cache_dir, "numpy", hashlib.sha256(path.encode("utf-8")).hexdigest() + ".npy")
     if os.path.exists(cached_numpy):
         print "exists, skipping"
         return cached_numpy
@@ -65,21 +75,23 @@ def convert_to_floatarray(path):
 
 
 def convert_to_png_freq(path):
-    cached_wav = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
-    cached_png = os.path.join(cache_dir, hashlib.sha256(path.encode("utf-8")).hexdigest() + ".png")
+    cached_wav = os.path.join(cache_dir, "audio", hashlib.sha256(path.encode("utf-8")).hexdigest() + ".wav")
+    cached_png = os.path.join(cache_dir, "frequency", hashlib.sha256(path.encode("utf-8")).hexdigest() + ".png")
     if os.path.exists(cached_png):
-        print "exists, skipping"
+        print "s",
         return cached_png
 
     data, samplerate = load(path)
+    if samplerate != 44100:
+        return None
 
     import freq
-    ff = freq.freqanalysis(data, samplerate)
-    freq.savefft(ff, cached_png)
+    ff, aa = freq.freqanalysis(data, samplerate)
+    freq.savefft(ff, cached_png, aa)
 
     os.unlink(cached_wav)
 
-    return cached_numpy
+    return cached_png
     
 
 def get_current_song():

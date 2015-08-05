@@ -6,6 +6,7 @@ import numpy
 import skimage
 import skimage.io
 import os
+import datetime
 #import fuel
 #import fuel.datasets
 
@@ -14,6 +15,7 @@ from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import SGD
 from keras_models_edited import UnsupervisedWackySequential
+from keras.callbacks import ModelCheckpoint
 
 from localdata import cache_dir
 from freq import blocks
@@ -118,14 +120,14 @@ def iterate_minibatches(batch_size):
 model = UnsupervisedWackySequential()
 
 # this was a default configuration for keras. seems as good as anything to start with.
-model.add(Convolution2D(32, 1, 3, 3, border_mode="full", init="he_normal"))
+model.add(Convolution2D(16, 1, 3, 3, border_mode="full", init="he_normal"))
 model.add(Activation("relu"))
-model.add(Convolution2D(32, 32, 3, 3, border_mode="full", init="he_normal"))
+model.add(Convolution2D(16, 16, 3, 3, border_mode="full", init="he_normal"))
 model.add(Activation("relu"))
 model.add(MaxPooling2D(poolsize=(2, 2)))
 model.add(Dropout(0.25))
 
-model.add(Convolution2D(64, 32, 3, 3, border_mode="full", init="he_normal"))
+model.add(Convolution2D(64, 16, 3, 3, border_mode="full", init="he_normal"))
 model.add(Activation("relu"))
 model.add(Convolution2D(64, 64, 3, 3, border_mode="full", init="he_normal"))
 model.add(Activation("relu"))
@@ -185,7 +187,7 @@ def train():
                 #TODO: this would probably be faster if it was shipped to the
                 # GPU in a batch. predict allows this, I just didn't want to
                 # do even more dimensionality-figuring-out
-                output = model.predict(numpy.array([[image2]]))[0]
+                output = model.predict(numpy.array([[image2]]), verbose=1)[0]
                 output = output.reshape((256,))
                 #output += numpy.random.normal(loc=0.05, scale=0.1, size=output.shape)
                 outputs.append(output)
@@ -199,8 +201,15 @@ def train():
 
     model.compile(loss="mean_squared_error", optimizer="adadelta",
             loading_func=loading_func)
+    #import pudb; pudb.set_trace()
+    loading_func([paths[0]], True)
 
-    model.fit(X, )
+    #checkpointer = ModelCheckpoint('model_%s.hdf5' % datetime.datetime.now(),
+    #        verbose=1, save_best_only=True)
+    #checkpointer_latest = ModelCheckpoint('model_%s_latest.hdf5' % datetime.datetime.now(),
+    #        verbose=1)
+    #model.fit(X, callbacks=[checkpointer, checkpointer_latest],
+    #        verbose=1)
 
 
 if __name__ == "__main__":

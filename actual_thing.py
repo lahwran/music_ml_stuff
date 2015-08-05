@@ -33,7 +33,7 @@ def load_image(path):
     return array
 
 
-def pick_chunks(loaded_image, chunk_count=12, random_seed=None):
+def pick_chunks(loaded_image, chunk_count=2, random_seed=None):
     if random_seed is None:
         r = random
     else:
@@ -46,7 +46,7 @@ def pick_chunks(loaded_image, chunk_count=12, random_seed=None):
         raise Exception("Got empty loaded_image!")
 
     pairs = zip(iter1, iter2)
-    included_pairs = r.sample(pairs, 12)
+    included_pairs = r.sample(pairs, 2)
     swapped_pairs = (r.sample(pair, 2) for pair in included_pairs)
     copied_pairs = [(numpy.copy(a), numpy.copy(b)) for a, b in swapped_pairs]
     return copied_pairs

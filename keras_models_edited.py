@@ -397,14 +397,14 @@ class UnsupervisedWackySequential(Model, containers.Sequential):
                 return function(*result)
             return wrapper
 
-        self._train = preprocess(theano.function(train_ins, train_loss,
-            updates=updates, allow_input_downcast=True, mode=theano_mode))
-        self._train_with_acc = preprocess(theano.function(train_ins, [train_loss, train_accuracy],
-            updates=updates, allow_input_downcast=True, mode=theano_mode))
-        self._test = preprocess(theano.function(test_ins, test_loss,
-            allow_input_downcast=True, mode=theano_mode), deterministic=True)
-        self._test_with_acc = preprocess(theano.function(test_ins, [test_loss, test_accuracy],
-            allow_input_downcast=True, mode=theano_mode), deterministic=True)
+        #self._train = preprocess(theano.function(train_ins, train_loss,
+        #    updates=updates, allow_input_downcast=True, mode=theano_mode))
+        #self._train_with_acc = preprocess(theano.function(train_ins, [train_loss, train_accuracy],
+        #    updates=updates, allow_input_downcast=True, mode=theano_mode))
+        #self._test = preprocess(theano.function(test_ins, test_loss,
+        #    allow_input_downcast=True, mode=theano_mode), deterministic=True)
+        #self._test_with_acc = preprocess(theano.function(test_ins, [test_loss, test_accuracy],
+        #    allow_input_downcast=True, mode=theano_mode), deterministic=True)
 
         self._predict = theano.function(predict_ins, self.y_test,
             allow_input_downcast=True, mode=theano_mode)

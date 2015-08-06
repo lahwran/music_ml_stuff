@@ -28,7 +28,6 @@ def load_image(path):
     array = array.transpose()[200:,:]
     array = blocks(array, 123, 123)
     b = time.time()
-    print "time to load an image:", b-a
 
     return array
 
@@ -46,7 +45,7 @@ def pick_chunks(loaded_image, chunk_count=2, random_seed=None):
         raise Exception("Got empty loaded_image!")
 
     pairs = zip(iter1, iter2)
-    included_pairs = r.sample(pairs, 2)
+    included_pairs = r.sample(pairs, chunk_count)
     swapped_pairs = (r.sample(pair, 2) for pair in included_pairs)
     copied_pairs = [(numpy.copy(a), numpy.copy(b)) for a, b in swapped_pairs]
     return copied_pairs
@@ -169,7 +168,8 @@ def train():
     random.shuffle(paths)
     train_length = int(len(paths) * 0.95)
 
-    X = numpy.array(paths[:30])
+    X = numpy.array(paths[:3000])
+    X_valid = numpy.array(paths[3000:3300])
 
     batch_size = 4 # times 12, see pick_chunks
     epochs = 2
@@ -181,35 +181,30 @@ def train():
             seed = 0
         for filename in filenames:
             image = load_image(os.path.join(basedir, filename))
-            print "getting outputs"
             for image1, image2 in pick_chunks(image, seed):
                 inputs.append([image1])
                 #TODO: this would probably be faster if it was shipped to the
                 # GPU in a batch. predict allows this, I just didn't want to
                 # do even more dimensionality-figuring-out
-                output = model.predict(numpy.array([[image2]]), verbose=1)[0]
+                output = model.predict(numpy.array([[image2]]))[0]
                 output = output.reshape((256,))
                 #output += numpy.random.normal(loc=0.05, scale=0.1, size=output.shape)
                 outputs.append(output)
-                print '.',
                 del image2
             print
         return numpy.array(inputs), numpy.array(outputs)
     #loading_func([paths[0]], True)
     #return
-    # TODO: save model each run
 
     model.compile(loss="mean_squared_error", optimizer="adadelta",
             loading_func=loading_func)
-    #import pudb; pudb.set_trace()
-    loading_func([paths[0]], True)
 
-    #checkpointer = ModelCheckpoint('model_%s.hdf5' % datetime.datetime.now(),
-    #        verbose=1, save_best_only=True)
-    #checkpointer_latest = ModelCheckpoint('model_%s_latest.hdf5' % datetime.datetime.now(),
-    #        verbose=1)
-    #model.fit(X, callbacks=[checkpointer, checkpointer_latest],
-    #        verbose=1)
+    checkpointer = ModelCheckpoint('model_%s.hdf5' % datetime.datetime.now(),
+            verbose=1, save_best_only=True)
+    checkpointer_latest = ModelCheckpoint('model_%s_latest.hdf5' % datetime.datetime.now(),
+            verbose=1)
+    model.fit(X, callbacks=[checkpointer, checkpointer_latest],
+            verbose=1, batch_size=30)
 
 
 if __name__ == "__main__":

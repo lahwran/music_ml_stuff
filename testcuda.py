@@ -1,3 +1,5 @@
+import os
+print os.environ["THEANO_FLAGS"]
 from theano import function, config, shared, sandbox
 import theano.tensor as T
 import numpy

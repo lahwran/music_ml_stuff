@@ -440,12 +440,12 @@ class UnsupervisedWackySequential(Model, containers.Sequential):
 
         val_f = None
         val_ins = None
-        if validation_data or validation_split:
+        if validation_data is not None or validation_split:
             if show_accuracy:
                 val_f = self._test_with_acc
             else:
                 val_f = self._test
-        if validation_data:
+        if validation_data is not None:
             X_val = validation_data
             X_val = standardize_X(X_val)
             val_ins = X_val
@@ -481,12 +481,10 @@ class UnsupervisedWackySequential(Model, containers.Sequential):
         else:
             return (proba > 0.5).astype('int32')
 
-    def evaluate(self, X, y, batch_size=128, show_accuracy=False, verbose=1, sample_weight=None):
+    def evaluate(self, X, batch_size=128, show_accuracy=False, verbose=1):
         X = standardize_X(X)
-        y = standardize_y(y)
-        sample_weight = standardize_weights(y, sample_weight=sample_weight)
 
-        ins = X + [y, sample_weight]
+        ins = X
         if show_accuracy:
             f = self._test_with_acc
         else:
@@ -617,9 +615,9 @@ class Graph(Model, containers.Graph):
 
         val_f = None
         val_ins = None
-        if validation_data or validation_split:
+        if validation_data is not None or validation_split:
             val_f = self._test
-        if validation_data:
+        if validation_data is not None:
             sample_weight = [standardize_weights(validation_data[name]) for name in self.output_order]
             val_ins = [validation_data[name] for name in self.input_order] + [standardize_y(validation_data[name]) for name in self.output_order] + sample_weight
 

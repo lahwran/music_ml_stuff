@@ -169,7 +169,7 @@ exceptioncount = 0
 
 def train(load_from=None):
     global exceptioncount
-    random.seed(0)
+    random.seed(1)
     basedir = os.path.join(cache_dir, "frequency")
     paths = [x for x in os.listdir(basedir) if x.endswith("png")]
     random.shuffle(paths)
@@ -186,7 +186,7 @@ def train(load_from=None):
         outputs = []
         seed = None
         if deterministic:
-            seed = 0
+            seed = 1
         for filename in filenames:
             try:
                 image = load_image(os.path.join(basedir, filename))
@@ -217,20 +217,26 @@ def train(load_from=None):
                     traceback.print_exc()
                     continue
         return numpy.array(inputs), numpy.array(outputs)
-    #loading_func([paths[0]], True)
-    #return
-
     model.compile(loss="mean_squared_error", optimizer="adadelta",
             loading_func=loading_func)
+    #print loading_func([paths[0]], True)[1][0]
+    ##return
 
+    #asdf = "/tmp/weights"
+    #model.save_weights(asdf)
+    #model.load_weights(asdf)
+    #print loading_func([paths[0]], True)[1][0]
+    #raise SystemExit
     if load_from is not None:
         model.load_weights(load_from)
+
 
     checkpointer = ModelCheckpoint('model_%s.hdf5' % datetime.datetime.now(),
             verbose=1, save_best_only=True)
     checkpointer_latest = ModelCheckpoint('model_%s_latest.hdf5' % datetime.datetime.now(),
             verbose=1)
     # default number of epochs = 100
+    print model.evaluate(X, show_accuracy=True)
     model.fit(X, callbacks=[checkpointer, checkpointer_latest],
             verbose=1, batch_size=3, nb_epoch=400000, validation_data=X_valid)
 
@@ -238,6 +244,6 @@ def train(load_from=None):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("file", default=None)
+    parser.add_argument("file", default=None, nargs="?")
     args = parser.parse_args()
     train(load_from=args.file)

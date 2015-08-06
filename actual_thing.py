@@ -1,5 +1,6 @@
 
 
+import traceback
 import itertools
 import random
 import numpy
@@ -32,7 +33,9 @@ def load_image(path):
     return array
 
 
-def pick_chunks(loaded_image, chunk_count=2, random_seed=None):
+# can't handle 15
+# can handle 10
+def pick_chunks(loaded_image, random_seed=None, chunk_count=3):
     if random_seed is None:
         r = random
     else:
@@ -42,10 +45,12 @@ def pick_chunks(loaded_image, chunk_count=2, random_seed=None):
     try:
         iter2.next()
     except StopIteration:
-        raise Exception("Got empty loaded_image!")
+        return []
 
     pairs = zip(iter1, iter2)
-    included_pairs = r.sample(pairs, chunk_count)
+    if len(pairs) < 1:
+        return []
+    included_pairs = r.sample(pairs, min(chunk_count, len(pairs)))
     swapped_pairs = (r.sample(pair, 2) for pair in included_pairs)
     copied_pairs = [(numpy.copy(a), numpy.copy(b)) for a, b in swapped_pairs]
     return copied_pairs
@@ -160,38 +165,57 @@ model.add(Activation("relu"))
 model.add(Dropout(0.25))
 
 
+exceptioncount = 0
 
-def train():
+def train(load_from=None):
+    global exceptioncount
     random.seed(0)
     basedir = os.path.join(cache_dir, "frequency")
     paths = [x for x in os.listdir(basedir) if x.endswith("png")]
     random.shuffle(paths)
+    skips = set(open("badlist", "r").read().replace("/mnt/frequency/", "").split('\n'))
+    paths = [x for x in paths if x not in skips]
     train_length = int(len(paths) * 0.95)
 
     X = numpy.array(paths[:3000])
     X_valid = numpy.array(paths[3000:3300])
 
-    batch_size = 4 # times 12, see pick_chunks
-    epochs = 2
     def loading_func(filenames, deterministic):
+        global exceptioncount
         inputs = []
         outputs = []
         seed = None
         if deterministic:
             seed = 0
         for filename in filenames:
-            image = load_image(os.path.join(basedir, filename))
-            for image1, image2 in pick_chunks(image, seed):
-                inputs.append([image1])
-                #TODO: this would probably be faster if it was shipped to the
-                # GPU in a batch. predict allows this, I just didn't want to
-                # do even more dimensionality-figuring-out
-                output = model.predict(numpy.array([[image2]]))[0]
-                output = output.reshape((256,))
-                #output += numpy.random.normal(loc=0.05, scale=0.1, size=output.shape)
-                outputs.append(output)
-                del image2
-            print
+            try:
+                image = load_image(os.path.join(basedir, filename))
+                for image1, image2 in pick_chunks(image, seed):
+                    #TODO: this would probably be faster if it was shipped to the
+                    # GPU in a batch. predict allows this, I just didn't want to
+                    # do even more dimensionality-figuring-out
+                    output = model.predict(numpy.array([[image2]]))[0]
+                    output = output.reshape((256,))
+                    #output += numpy.random.normal(loc=0.05, scale=0.1, size=output.shape)
+                    inputs.append([image1])
+                    outputs.append(output)
+                    del image2
+            except:
+                print "error loading", filename
+                with open("errors", "wa") as writer:
+                    writer.write("\n")
+                    writer.write("filename: ")
+                    writer.write(filename)
+                    writer.write("\n")
+                    writer.write(traceback.format_exc())
+                    writer.write('\n')
+
+                exceptioncount += 1
+                if exceptioncount > 12000:
+                    raise
+                else:
+                    traceback.print_exc()
+                    continue
         return numpy.array(inputs), numpy.array(outputs)
     #loading_func([paths[0]], True)
     #return
@@ -199,13 +223,21 @@ def train():
     model.compile(loss="mean_squared_error", optimizer="adadelta",
             loading_func=loading_func)
 
+    if load_from is not None:
+        model.load_weights(load_from)
+
     checkpointer = ModelCheckpoint('model_%s.hdf5' % datetime.datetime.now(),
             verbose=1, save_best_only=True)
     checkpointer_latest = ModelCheckpoint('model_%s_latest.hdf5' % datetime.datetime.now(),
             verbose=1)
+    # default number of epochs = 100
     model.fit(X, callbacks=[checkpointer, checkpointer_latest],
-            verbose=1, batch_size=30)
+            verbose=1, batch_size=3, nb_epoch=400000, validation_data=X_valid)
 
 
 if __name__ == "__main__":
-    train()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("file", default=None)
+    args = parser.parse_args()
+    train(load_from=args.file)

@@ -177,8 +177,8 @@ def train(load_from=None):
     paths = [x for x in paths if x not in skips]
     train_length = int(len(paths) * 0.95)
 
-    X = numpy.array(paths[:3000])
-    X_valid = numpy.array(paths[3000:3300])
+    X = numpy.array(paths[:3])
+    X_valid = numpy.array(paths[3:6])
 
     def loading_func(filenames, deterministic):
         global exceptioncount
@@ -196,6 +196,17 @@ def train(load_from=None):
                     # do even more dimensionality-figuring-out
                     output = model.predict(numpy.array([[image2]]))[0]
                     output = output.reshape((256,))
+                    #m = numpy.max(output)
+                    # TODO: EXPERIMENT APPEARS TO HAVE FAILED - as far as I can
+                    # tell, it converged to zero. I don't have good debug
+                    # tooling to visualize the trained model, but when you
+                    # load the model I have and try to run it, you get exactly
+                    # zero output and exactly zero loss. I suspect that it
+                    # would be solved by normalizing the outputs here. I may
+                    # pick this particular project back up again in the future;
+                    # for now, I'm going to move on to a different approach,
+                    # so I get some experience with other approaches.
+
                     #output += numpy.random.normal(loc=0.05, scale=0.1, size=output.shape)
                     inputs.append([image1])
                     outputs.append(output)
@@ -238,7 +249,8 @@ def train(load_from=None):
     # default number of epochs = 100
     print model.evaluate(X, show_accuracy=True)
     model.fit(X, callbacks=[checkpointer, checkpointer_latest],
-            verbose=1, batch_size=3, nb_epoch=400000, validation_data=X_valid)
+            verbose=1, batch_size=3, nb_epoch=1, validation_data=X_valid,
+            show_accuracy=True)
 
 
 if __name__ == "__main__":

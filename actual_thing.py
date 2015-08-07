@@ -1,5 +1,6 @@
 
 
+from functools import partial
 import traceback
 import itertools
 import random
@@ -11,12 +12,16 @@ import datetime
 #import fuel
 #import fuel.datasets
 
+import theano
+import theano.compile
+import theano.compile.monitormode
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import SGD
 from keras_models_edited import UnsupervisedWackySequential
 from keras.callbacks import ModelCheckpoint
+import keras.constraints
 
 from localdata import cache_dir
 from freq import blocks
@@ -123,6 +128,9 @@ def iterate_minibatches(batch_size):
 
 model = UnsupervisedWackySequential()
 
+Convolution2D = partial(Convolution2D, W_constraint=keras.constraints.maxnorm(2))
+Dense = partial (Dense, W_constraint=keras.constraints.maxnorm(2))
+
 # this was a default configuration for keras. seems as good as anything to start with.
 model.add(Convolution2D(16, 1, 3, 3, border_mode="full", init="he_normal"))
 model.add(Activation("relu"))
@@ -189,7 +197,7 @@ def train(load_from=None):
         # scaling rather than shifting (multiplication instead of addition).
         # but my brain is full and I'm on a deadline, so the worst case is that
         # this turns out to be another failed attempt.
-        hyper_normal_loc = 0.05
+        hyper_normal_loc = 0.00
         hyper_normal_scale = 0.1
         hyper_in_song_delta = 0.01
         hyper_batch_delta = 0.1
@@ -209,16 +217,26 @@ def train(load_from=None):
                     # GPU in a batch. predict allows this, I just didn't want to
                     # do even more dimensionality-figuring-out
                     output = model.predict(numpy.array([[image2]]))[0]
+
+                    # normalize
                     output = output.reshape((256,))
                     output -= numpy.min(output)
                     m = numpy.max(output)
                     output /= m
+                    output -= 0.5
+                    output *= 2
+
+                    # tweak
                     output += numpy.random.normal(loc=hyper_normal_loc,
                             scale=hyper_normal_scale,
                             size=output.shape)
+
+
                     inputs.append([image1])
                     song_outputs.append(output)
                     del image2
+            except KeyboardInterrupt:
+                raise
             except:
                 print "error loading", filename
                 with open("errors", "wa") as writer:
@@ -243,6 +261,7 @@ def train(load_from=None):
         # shift song values away from each other by a fairly large margin
         batch_song_outputs = numpy.array(batch_song_outputs)
         shift(batch_song_outputs, delta=hyper_batch_delta)
+        #numpy.clip(batch_song_outputs, -1, 1, out=batch_song_outputs)
 
         result = numpy.array(inputs), batch_song_outputs.reshape(-1, 256)
         print result[0].shape
@@ -268,9 +287,14 @@ def train(load_from=None):
             verbose=1)
     # default number of epochs = 100
     print model.evaluate(X[:3], show_accuracy=True)
-    model.fit(X, callbacks=[checkpointer, checkpointer_latest],
-            verbose=1, batch_size=3, nb_epoch=40000, validation_data=X_valid,
-            show_accuracy=True)
+    try:
+        model.fit(X, callbacks=[checkpointer, checkpointer_latest],
+                verbose=1, batch_size=3, nb_epoch=40000, validation_data=X_valid,
+                show_accuracy=True)
+    finally:
+        image = pick_chunks(load_image(os.path.join(basedir, X[-1])), True)
+        output = model.predict(numpy.array([[image[0][1]]]))[0]
+        print output
 
 
 if __name__ == "__main__":

@@ -165,6 +165,9 @@ model.add(Activation("relu"))
 model.add(Dropout(0.25))
 
 
+def shift(wrap_array, delta=0.1):
+    wrap_array += numpy.sign([wrap_array[x] - wrap_array[x-1] for x in range(wrap_array.shape[0])]) * delta
+
 exceptioncount = 0
 
 def train(load_from=None):
@@ -177,17 +180,28 @@ def train(load_from=None):
     paths = [x for x in paths if x not in skips]
     train_length = int(len(paths) * 0.95)
 
-    X = numpy.array(paths[:3])
-    X_valid = numpy.array(paths[3:6])
+    X = numpy.array(paths[:3000])
+    X_valid = numpy.array(paths[3000:3300])
 
     def loading_func(filenames, deterministic):
+        # TODO: introducing hyperparameters!? this is going to fail horribly.
+        # if I had more mental space right now, I'd do this so that shift used
+        # scaling rather than shifting (multiplication instead of addition).
+        # but my brain is full and I'm on a deadline, so the worst case is that
+        # this turns out to be another failed attempt.
+        hyper_normal_loc = 0.05
+        hyper_normal_scale = 0.1
+        hyper_in_song_delta = 0.01
+        hyper_batch_delta = 0.1
+
         global exceptioncount
         inputs = []
-        outputs = []
+        batch_song_outputs = []
         seed = None
         if deterministic:
             seed = 1
         for filename in filenames:
+            song_outputs = []
             try:
                 image = load_image(os.path.join(basedir, filename))
                 for image1, image2 in pick_chunks(image, seed):
@@ -196,20 +210,14 @@ def train(load_from=None):
                     # do even more dimensionality-figuring-out
                     output = model.predict(numpy.array([[image2]]))[0]
                     output = output.reshape((256,))
-                    #m = numpy.max(output)
-                    # TODO: EXPERIMENT APPEARS TO HAVE FAILED - as far as I can
-                    # tell, it converged to zero. I don't have good debug
-                    # tooling to visualize the trained model, but when you
-                    # load the model I have and try to run it, you get exactly
-                    # zero output and exactly zero loss. I suspect that it
-                    # would be solved by normalizing the outputs here. I may
-                    # pick this particular project back up again in the future;
-                    # for now, I'm going to move on to a different approach,
-                    # so I get some experience with other approaches.
-
-                    #output += numpy.random.normal(loc=0.05, scale=0.1, size=output.shape)
+                    output -= numpy.min(output)
+                    m = numpy.max(output)
+                    output /= m
+                    output += numpy.random.normal(loc=hyper_normal_loc,
+                            scale=hyper_normal_scale,
+                            size=output.shape)
                     inputs.append([image1])
-                    outputs.append(output)
+                    song_outputs.append(output)
                     del image2
             except:
                 print "error loading", filename
@@ -227,10 +235,22 @@ def train(load_from=None):
                 else:
                     traceback.print_exc()
                     continue
-        return numpy.array(inputs), numpy.array(outputs)
+            # shift in-song values away from each other just slightly
+            song_outputs = numpy.array(song_outputs)
+            shift(song_outputs, delta=hyper_in_song_delta)
+            batch_song_outputs.append(song_outputs)
+
+        # shift song values away from each other by a fairly large margin
+        batch_song_outputs = numpy.array(batch_song_outputs)
+        shift(batch_song_outputs, delta=hyper_batch_delta)
+
+        result = numpy.array(inputs), batch_song_outputs.reshape(-1, 256)
+        print result[0].shape
+        print result[1].shape
+        return result
     model.compile(loss="mean_squared_error", optimizer="adadelta",
             loading_func=loading_func)
-    #print loading_func([paths[0]], True)[1][0]
+    print loading_func(paths[0:3], True)[1]
     ##return
 
     #asdf = "/tmp/weights"
@@ -247,9 +267,9 @@ def train(load_from=None):
     checkpointer_latest = ModelCheckpoint('model_%s_latest.hdf5' % datetime.datetime.now(),
             verbose=1)
     # default number of epochs = 100
-    print model.evaluate(X, show_accuracy=True)
+    print model.evaluate(X[:3], show_accuracy=True)
     model.fit(X, callbacks=[checkpointer, checkpointer_latest],
-            verbose=1, batch_size=3, nb_epoch=1, validation_data=X_valid,
+            verbose=1, batch_size=3, nb_epoch=40000, validation_data=X_valid,
             show_accuracy=True)
 
 
